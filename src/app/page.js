@@ -5,7 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Upload, Sparkles, Trash2, Download, Maximize, 
   Type, Layout, Image as ImageIcon, CheckCircle2, 
-  Menu, X, History, Layers, Settings, Languages 
+  Menu, X, History, Layers, Settings, Languages,
+  Mic, Sliders, Monitor, Share2, Save
 } from 'lucide-react';
 import { interpretCommand, getResponse } from '@/lib/multilingual-ai';
 import { resizeImage, addTextToImage } from '@/lib/image-utils';
@@ -17,6 +18,8 @@ export default function PhotoProStudio() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [activeTab, setActiveTab] = useState('editor');
   const [selectedSize, setSelectedSize] = useState('1:1');
+  const [exportFormat, setExportFormat] = useState('PNG');
+  const [exportQuality, setExportQuality] = useState('100%');
   const fileInputRef = useRef(null);
 
   const socialSizes = [
@@ -27,347 +30,395 @@ export default function PhotoProStudio() {
   ];
 
   const handleUpload = (e) => {
-    const filesArray = Array.from(e.target.files).slice(0, 20); // Max 20 images
+    const filesArray = Array.from(e.target.files).slice(0, 20);
     const newImages = filesArray.map(file => ({
       id: Math.random().toString(36).substr(2, 9),
       url: URL.createObjectURL(file),
       file: file,
       name: file.name,
-      status: 'uploaded',
-      processed: false
+      status: 'Uploaded',
+      processed: false,
+      style: 'Normal'
     }));
     setImages(prev => [...prev, ...newImages]);
   };
 
-  const runAICommand = async () => {
-    if (!command.trim()) return;
+  const runAICommand = async (manualCommand = null) => {
+    const targetCommand = manualCommand || command;
+    if (!targetCommand.trim()) return;
     setIsProcessing(true);
     
-    const interpretation = interpretCommand(command);
+    const interpretation = interpretCommand(targetCommand);
     
     try {
       if (interpretation.action === 'addText' && images.length > 0) {
-        const textToSearch = command.split(' ').pop(); // Simple heuristic for text
+        const textToSearch = targetCommand.split(' ').pop();
         const updatedImages = await Promise.all(images.map(async (img) => {
           const newUrl = await addTextToImage(img.url, textToSearch);
           return { ...img, url: newUrl, processed: true, status: 'Text Added' };
         }));
         setImages(updatedImages);
       } else if (interpretation.action === 'backgroundRemoval') {
-        // Simulate background removal
-        setImages(prev => prev.map(img => ({ ...img, processed: true, status: 'No BG' })));
+        setImages(prev => prev.map(img => ({ ...img, processed: true, status: 'No Background' })));
       } else if (interpretation.action === 'generateImage') {
         const newImage = {
           id: Math.random().toString(36).substr(2, 9),
           url: `https://picsum.photos/seed/${Math.random()}/1080/1080`,
           name: 'AI Generated',
           status: 'AI Generated',
-          processed: true
+          processed: true,
+          style: 'Cinematic'
         };
         setImages(prev => [...prev, newImage]);
+      } else if (interpretation.action === 'professionalStyle') {
+        setImages(prev => prev.map(img => ({ ...img, processed: true, style: 'Professional', status: 'Enhanced' })));
+      } else if (interpretation.action === 'resize') {
+        setImages(prev => prev.map(img => ({ ...img, status: 'Resized' })));
       }
 
       const newEntry = {
         id: Date.now(),
-        command: command,
+        command: targetCommand,
         action: interpretation.action,
         timestamp: new Date().toLocaleTimeString(),
-        result: 'Command executed'
+        result: 'Success'
       };
       
       setHistory(prev => [newEntry, ...prev]);
     } catch (err) {
       console.error(err);
     } finally {
-      setCommand('');
+      if (!manualCommand) setCommand('');
       setIsProcessing(false);
     }
   };
 
-  const deleteHistory = (id) => {
-    setHistory(prev => prev.filter(item => item.id !== id));
-  };
-
-  const clearAllHistory = () => {
-    setHistory([]);
+  const clearHistory = (id = null) => {
+    if (id) {
+      setHistory(prev => prev.filter(i => i.id !== id));
+    } else {
+      setHistory([]);
+    }
   };
 
   return (
-    <div className="min-h-screen hero-gradient text-white overflow-hidden flex flex-col">
-      {/* Top Navigation */}
-      <nav className="h-16 glass-morphism px-6 flex items-center justify-between z-50">
-        <div className="flex items-center gap-2">
-          <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center glow-effect">
-            <Sparkles className="w-6 h-6 text-white" />
+    <div className="h-screen bg-[#0a0a0c] text-white overflow-hidden flex flex-col font-sans selection:bg-primary selection:text-white">
+      {/* Premium Navigation */}
+      <nav className="h-20 glass-morphism px-8 flex items-center justify-between z-50 border-b border-white/5 shadow-2xl shrink-0">
+        <div className="flex items-center gap-3">
+          <motion.div 
+            onClick={() => setActiveTab('editor')}
+            whileHover={{ rotate: 180 }}
+            className="w-12 h-12 bg-gradient-to-tr from-primary to-accent rounded-2xl flex items-center justify-center glow-effect shadow-[0_0_20px_rgba(99,102,241,0.4)] cursor-pointer"
+          >
+            <Sparkles className="w-7 h-7 text-white" />
+          </motion.div>
+          <div>
+            <span className="text-2xl font-black tracking-tighter uppercase italic">Nexus<span className="text-primary not-italic">Edit</span></span>
+            <div className="flex items-center gap-1">
+              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+              <span className="text-[10px] font-bold text-gray-500 tracking-widest uppercase">AI Studio Live</span>
+            </div>
           </div>
-          <span className="text-xl font-bold tracking-tight">Nexus<span className="text-primary">Edit</span> AI</span>
         </div>
 
-        <div className="hidden md:flex items-center gap-6">
-          <button className="text-sm font-medium hover:text-primary transition-colors">Templates</button>
-          <button className="text-sm font-medium hover:text-primary transition-colors">Social Sizes</button>
-          <button className="text-sm font-medium hover:text-primary transition-colors">Pricing</button>
+        <div className="hidden lg:flex items-center gap-8">
+          <button onClick={() => setActiveTab('editor')} className="text-sm font-bold text-gray-400 hover:text-white transition-all uppercase tracking-wide">Studio</button>
+          <button onClick={() => setActiveTab('history')} className="text-sm font-bold text-gray-400 hover:text-white transition-all uppercase tracking-wide">History</button>
+          <button className="text-sm font-bold text-gray-400 hover:text-white transition-all uppercase tracking-wide">Templates</button>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 px-3 py-1.5 glass-morphism rounded-full text-xs font-semibold">
-            <Languages className="w-4 h-4" />
-            <span>Urdu / Eng / Roman</span>
+        <div className="flex items-center gap-6">
+          {activeTab !== 'editor' && (
+            <button 
+              onClick={() => setActiveTab('editor')}
+              className="hidden md:flex items-center gap-2 px-4 py-2 bg-white/5 rounded-xl border border-white/10 text-xs font-bold uppercase hover:bg-white/10 transition-all"
+            >
+              <X className="w-4 h-4" />
+              <span>Back to Editor</span>
+            </button>
+          )}
+          <div className="flex items-center gap-3 px-4 py-2 bg-white/5 rounded-2xl border border-white/10">
+            <Languages className="w-4 h-4 text-primary" />
+            <span className="text-xs font-black uppercase">UR / EN / ROM</span>
           </div>
-          <button className="bg-primary hover:bg-opacity-90 px-4 py-2 rounded-lg text-sm font-bold transition-all glow-effect">
-            Upgrade Pro
-          </button>
         </div>
       </nav>
 
       <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar */}
-        <aside className="w-64 glass-morphism border-r border-white/10 p-4 hidden lg:flex flex-col gap-6">
-          <div>
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Dashboard</h3>
-            <div className="space-y-1">
-              {['Editor', 'History', 'Assets', 'Presets'].map(tab => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab.toLowerCase())}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                    activeTab === tab.toLowerCase() ? 'bg-primary text-white glow-effect' : 'hover:bg-white/5 text-gray-400'
-                  }`}
-                >
-                  {tab === 'Editor' && <Layout className="w-5 h-5" />}
-                  {tab === 'History' && <History className="w-5 h-5" />}
-                  {tab === 'Assets' && <ImageIcon className="w-5 h-5" />}
-                  {tab === 'Presets' && <Settings className="w-5 h-5" />}
-                  <span className="font-medium">{tab}</span>
-                </button>
-              ))}
-            </div>
+        {/* Modern Sidebar */}
+        <aside className="w-24 lg:w-72 glass-morphism border-r border-white/5 p-6 flex flex-col gap-8">
+          <div className="space-y-2">
+            <h3 className="hidden lg:block text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-4">Main Menu</h3>
+            {[
+              { id: 'editor', icon: Layout, label: 'Studio' },
+              { id: 'history', icon: History, label: 'History' },
+              { id: 'assets', icon: ImageIcon, label: 'Vault' },
+              { id: 'settings', icon: Settings, label: 'Config' }
+            ].map(item => (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id)}
+                className={`w-full flex items-center gap-4 px-4 py-4 rounded-2xl transition-all group ${
+                  activeTab === item.id ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-gray-500 hover:bg-white/5 hover:text-white'
+                }`}
+              >
+                <item.icon className={`w-6 h-6 ${activeTab === item.id ? 'animate-pulse' : 'group-hover:scale-110 transition-transform'}`} />
+                <span className="hidden lg:block font-bold text-sm tracking-tight">{item.label}</span>
+              </button>
+            ))}
           </div>
 
-          <div className="mt-auto">
-            <div className="p-4 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 border border-white/10">
-              <p className="text-sm font-bold mb-1">Unlimited Gen</p>
-              <p className="text-xs text-gray-400 mb-3">You have 100% access to all features.</p>
-              <div className="h-1 w-full bg-white/10 rounded-full overflow-hidden">
-                <div className="h-full bg-primary w-full shadow-[0_0_10px_#6366f1]"></div>
+          <div className="mt-auto hidden lg:block">
+            <div className="p-6 rounded-3xl bg-gradient-to-br from-white/5 to-white/0 border border-white/5 relative overflow-hidden group">
+              <div className="absolute -top-10 -right-10 w-32 h-32 bg-primary/10 rounded-full blur-3xl group-hover:bg-primary/20 transition-all"></div>
+              <p className="text-xs font-black uppercase text-primary mb-2 tracking-widest">AI Power</p>
+              <h4 className="text-sm font-bold mb-4">Unlimited Gen Active</h4>
+              <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: '100%' }}
+                  className="h-full bg-primary shadow-[0_0_15px_#6366f1]"
+                ></motion.div>
               </div>
             </div>
           </div>
         </aside>
 
-        {/* Main Workspace */}
-        <main className="flex-1 overflow-y-auto p-6 md:p-8">
+        {/* Studio Workspace */}
+        <main className="flex-1 overflow-y-auto p-6 lg:p-12">
           <AnimatePresence mode="wait">
             {activeTab === 'editor' ? (
               <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                className="max-w-6xl mx-auto space-y-8"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="max-w-7xl mx-auto space-y-12"
               >
-                {/* AI Command Center */}
-                <section className="glass-morphism p-1 rounded-2xl border border-primary/30 glow-effect">
-                  <div className="flex items-center gap-3 p-2">
-                    <div className="flex-1 relative">
-                      <Sparkles className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-primary" />
+                {/* AI Instruction Bar - ENHANCED */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 px-2">
+                    <Sparkles className="w-5 h-5 text-primary" />
+                    <h2 className="text-sm font-black uppercase tracking-[0.3em] text-gray-500">AI Instructions Assistant</h2>
+                  </div>
+                  <section className="bg-white/5 p-1.5 rounded-[2.5rem] border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] focus-within:border-primary/50 transition-all">
+                    <div className="flex items-center gap-4 px-4">
+                      <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center">
+                        <Mic className="w-5 h-5 text-gray-400" />
+                      </div>
                       <input 
                         value={command}
                         onChange={(e) => setCommand(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && runAICommand()}
                         type="text" 
-                        placeholder="Bolo kya krna hai? (e.g., 'Background hatao' or 'Make it professional')"
-                        className="w-full bg-transparent border-none outline-none py-4 pl-12 pr-4 text-lg font-medium placeholder:text-gray-500"
+                        placeholder="Mery command urdu, english, roman urdu main smjhy... (e.g. 'Background hatao')"
+                        className="flex-1 bg-transparent border-none outline-none py-6 text-xl font-medium placeholder:text-gray-600"
                       />
+                      <motion.button 
+                        whileTap={{ scale: 0.9 }}
+                        onClick={() => runAICommand()}
+                        disabled={isProcessing}
+                        className="bg-primary hover:bg-primary/80 px-8 py-4 rounded-[2rem] font-black uppercase tracking-widest text-sm flex items-center gap-3 shadow-xl shadow-primary/20 disabled:opacity-50"
+                      >
+                        {isProcessing ? "Processing..." : (
+                          <>
+                            <span>Run Magic</span>
+                            <Sparkles className="w-4 h-4" />
+                          </>
+                        )}
+                      </motion.button>
                     </div>
-                    <button 
-                      onClick={runAICommand}
-                      disabled={isProcessing}
-                      className="bg-primary hover:bg-opacity-90 p-4 rounded-xl transition-all disabled:opacity-50"
-                    >
-                      {isProcessing ? <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" /> : <Sparkles className="w-5 h-5" />}
-                    </button>
-                  </div>
-                </section>
+                  </section>
+                </div>
 
-                {/* Grid of Images */}
-                <section className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-2xl font-bold">Workspace <span className="text-gray-500 text-sm font-normal ml-2">{images.length}/20 Images</span></h2>
-                    <div className="flex items-center gap-3">
+                {/* Batch Workspace */}
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between px-2">
+                    <div className="flex items-center gap-4">
+                      <h2 className="text-3xl font-black italic tracking-tighter uppercase">Canvas</h2>
+                      <div className="px-3 py-1 bg-white/5 rounded-full text-[10px] font-black text-gray-500 border border-white/10 uppercase">
+                        {images.length} / 20 Images
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <button 
+                        onClick={() => setImages([])}
+                        className="text-xs font-bold text-gray-500 hover:text-accent transition-all uppercase"
+                      >Clear All</button>
                       <button 
                         onClick={() => fileInputRef.current.click()}
-                        className="flex items-center gap-2 px-4 py-2 glass-morphism rounded-xl hover:bg-white/5 transition-all"
+                        className="bg-white/5 hover:bg-white/10 border border-white/10 px-6 py-3 rounded-2xl font-bold text-sm flex items-center gap-2 transition-all"
                       >
                         <Upload className="w-4 h-4" />
                         <span>Upload Batch</span>
                       </button>
-                      <input 
-                        type="file" 
-                        ref={fileInputRef} 
-                        onChange={handleUpload} 
-                        multiple 
-                        className="hidden" 
-                        accept="image/*"
-                      />
+                      <input type="file" ref={fileInputRef} onChange={handleUpload} multiple className="hidden" accept="image/*" />
                     </div>
                   </div>
 
                   {images.length === 0 ? (
-                    <div 
+                    <motion.div 
+                      whileHover={{ scale: 1.01 }}
                       onClick={() => fileInputRef.current.click()}
-                      className="border-2 border-dashed border-white/10 rounded-3xl h-96 flex flex-col items-center justify-center gap-4 hover:border-primary/50 hover:bg-primary/5 transition-all cursor-pointer group"
+                      className="h-[500px] border-2 border-dashed border-white/5 rounded-[3rem] bg-white/[0.02] flex flex-col items-center justify-center gap-8 cursor-pointer group transition-all hover:border-primary/30"
                     >
-                      <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <Upload className="w-10 h-10 text-gray-400 group-hover:text-primary" />
+                      <div className="w-24 h-24 bg-white/5 rounded-[2rem] flex items-center justify-center group-hover:bg-primary/10 transition-all">
+                        <Upload className="w-10 h-10 text-gray-500 group-hover:text-primary group-hover:scale-125 transition-all" />
                       </div>
-                      <div className="text-center">
-                        <p className="text-xl font-bold">Drag & Drop or Click to Upload</p>
-                        <p className="text-gray-500">Supports PNG, JPG, WEBP (Max 20 images at once)</p>
+                      <div className="text-center space-y-2">
+                        <p className="text-2xl font-black uppercase tracking-widest">Drop up to 20 images</p>
+                        <p className="text-gray-500 font-medium">PNG, JPG, WEBP • Professional Studio Quality</p>
                       </div>
-                    </div>
+                    </motion.div>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                       {images.map(img => (
                         <motion.div 
                           layoutId={img.id}
-                          key={img.id} 
-                          className="group relative aspect-square glass-morphism rounded-2xl overflow-hidden border border-white/5 hover:border-primary/50 transition-all"
+                          key={img.id}
+                          className="group relative aspect-square rounded-[2rem] overflow-hidden border border-white/5 bg-white/5 shadow-2xl"
                         >
-                          <img src={img.url} alt={img.name} className="w-full h-full object-cover" />
+                          <img src={img.url} alt={img.name} className={`w-full h-full object-cover transition-all duration-700 ${img.style === 'Professional' ? 'contrast-125 brightness-110 saturate-110' : ''}`} />
                           
-                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-3 p-4">
-                            <div className="flex items-center gap-2">
-                              <button className="p-2 bg-white/10 rounded-lg hover:bg-primary transition-colors"><Maximize className="w-4 h-4" /></button>
-                              <button className="p-2 bg-white/10 rounded-lg hover:bg-primary transition-colors"><Download className="w-4 h-4" /></button>
-                              <button 
-                                onClick={() => setImages(prev => prev.filter(i => i.id !== img.id))}
-                                className="p-2 bg-white/10 rounded-lg hover:bg-accent transition-colors"
-                              ><Trash2 className="w-4 h-4" /></button>
-                            </div>
-                            <span className="text-[10px] uppercase font-bold tracking-widest text-gray-400">{img.status}</span>
+                          <div className="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center gap-4 p-6 backdrop-blur-sm">
+                             <div className="flex items-center gap-3">
+                               <button className="p-3 bg-white/10 rounded-xl hover:bg-primary transition-all"><Download className="w-5 h-5" /></button>
+                               <button className="p-3 bg-white/10 rounded-xl hover:bg-primary transition-all"><Maximize className="w-5 h-5" /></button>
+                               <button 
+                                 onClick={() => setImages(prev => prev.filter(i => i.id !== img.id))}
+                                 className="p-3 bg-white/10 rounded-xl hover:bg-accent transition-all"
+                               ><Trash2 className="w-5 h-5" /></button>
+                             </div>
+                             <div className="text-center">
+                               <p className="text-xs font-black uppercase tracking-widest text-primary mb-1">{img.status}</p>
+                               <p className="text-[10px] font-bold text-gray-500 uppercase">{img.style} Style</p>
+                             </div>
                           </div>
 
                           {img.processed && (
-                            <div className="absolute top-2 right-2 bg-green-500 p-1 rounded-full shadow-lg">
-                              <CheckCircle2 className="w-3 h-3 text-white" />
+                            <div className="absolute top-4 right-4 bg-primary p-2 rounded-full shadow-[0_0_15px_#6366f1]">
+                              <CheckCircle2 className="w-4 h-4 text-white" />
                             </div>
                           )}
                         </motion.div>
                       ))}
                     </div>
                   )}
-                </section>
+                </div>
 
-                {/* Professional Toolset */}
-                <section className="grid md:grid-cols-3 gap-6">
-                  <div className="glass-morphism p-6 rounded-3xl space-y-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-3 bg-blue-500/20 rounded-2xl"><Layers className="w-6 h-6 text-blue-400" /></div>
-                      <h3 className="font-bold text-lg">Batch Editing</h3>
-                    </div>
-                    <p className="text-sm text-gray-400">Apply background removal or filters to all {images.length} images at once.</p>
-                    <button className="w-full py-3 bg-white/5 hover:bg-white/10 rounded-xl font-bold transition-all border border-white/10">Apply Multi-Edit</button>
-                  </div>
-
-                  <div className="glass-morphism p-6 rounded-3xl space-y-4 text-center border-primary/20">
-                    <div className="mx-auto p-3 bg-primary/20 rounded-2xl w-fit"><Sparkles className="w-6 h-6 text-primary" /></div>
-                    <h3 className="font-bold text-lg">AI Smart Background</h3>
-                    <p className="text-sm text-gray-400">Automatically add stylish backgrounds matching your product.</p>
-                    <button className="w-full py-3 bg-primary rounded-xl font-bold transition-all glow-effect">Magic Replace</button>
-                  </div>
-
-                  <div className="glass-morphism p-6 rounded-3xl space-y-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-3 bg-accent/20 rounded-2xl"><Type className="w-6 h-6 text-accent" /></div>
-                      <h3 className="font-bold text-lg">Dynamic Text</h3>
-                    </div>
-                    <p className="text-sm text-gray-400">Add marketing text, prices, and labels with AI placement.</p>
-                    <button className="w-full py-3 bg-white/5 hover:bg-white/10 rounded-xl font-bold transition-all border border-white/10">Open Text Editor</button>
-                  </div>
+                {/* Quick Action Tools */}
+                <section className="grid md:grid-cols-3 gap-8">
+                  {[
+                    { icon: Layers, title: 'Apply to All', desc: 'Process all images with the current AI instruction.', color: 'blue', action: () => runAICommand() },
+                    { icon: Sparkles, title: 'AI Backgrounds', desc: 'Auto-replace backgrounds with stylish studio settings.', color: 'purple', action: () => runAICommand('Background hatao') },
+                    { icon: Sliders, title: 'Pro Enhancer', desc: 'Auto color correction, lighting, and quality boost.', color: 'green', action: () => runAICommand('Professional banao') }
+                  ].map((tool, idx) => (
+                    <button 
+                      key={idx}
+                      onClick={tool.action}
+                      className="group p-8 rounded-[2.5rem] bg-white/5 border border-white/5 hover:border-white/10 text-left transition-all hover:translate-y-[-10px] shadow-xl"
+                    >
+                      <div className={`w-14 h-14 rounded-2xl mb-6 flex items-center justify-center bg-${tool.color}-500/20 group-hover:scale-110 transition-transform`}>
+                        <tool.icon className={`w-7 h-7 text-${tool.color}-400`} />
+                      </div>
+                      <h3 className="text-xl font-black mb-2 uppercase tracking-tight italic">{tool.title}</h3>
+                      <p className="text-sm text-gray-500 leading-relaxed">{tool.desc}</p>
+                    </button>
+                  ))}
                 </section>
               </motion.div>
             ) : activeTab === 'history' ? (
-              <motion.div 
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="max-w-4xl mx-auto space-y-6"
-              >
-                <div className="flex items-center justify-between">
-                  <h2 className="text-3xl font-bold">Activity History</h2>
-                  <button 
-                    onClick={clearAllHistory}
-                    className="flex items-center gap-2 text-gray-400 hover:text-accent transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    <span>Clear All</span>
-                  </button>
-                </div>
-
-                <div className="space-y-4">
-                  {history.length === 0 ? (
-                    <div className="text-center py-20 text-gray-500">
-                      <History className="w-16 h-16 mx-auto mb-4 opacity-10" />
-                      <p>No history found. Start by giving an AI command!</p>
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-4xl mx-auto space-y-8">
+                 <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <button 
+                        onClick={() => setActiveTab('editor')}
+                        className="p-3 bg-white/5 rounded-2xl hover:bg-primary transition-all border border-white/10 group"
+                      >
+                        <X className="w-5 h-5 group-hover:rotate-90 transition-transform" />
+                      </button>
+                      <h2 className="text-4xl font-black italic uppercase tracking-tighter">Activity</h2>
                     </div>
-                  ) : (
-                    history.map(item => (
-                      <div key={item.id} className="glass-morphism p-5 rounded-2xl flex items-center justify-between group border border-white/5 hover:border-primary/30 transition-all">
-                        <div className="flex items-center gap-4">
-                          <div className="p-3 bg-primary/10 rounded-xl">
-                            <Sparkles className="w-5 h-5 text-primary" />
+                    <button onClick={() => clearHistory()} className="px-6 py-2 bg-white/5 border border-white/10 rounded-xl text-xs font-bold uppercase hover:text-accent transition-all">Flush History</button>
+                 </div>
+                 <div className="space-y-4">
+                    {history.length === 0 ? (
+                      <div className="text-center py-40 opacity-20"><History className="w-20 h-20 mx-auto" /></div>
+                    ) : (
+                      history.map(item => (
+                        <div key={item.id} className="p-6 bg-white/5 rounded-3xl border border-white/5 flex items-center justify-between group">
+                          <div className="flex items-center gap-6">
+                             <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center"><Sparkles className="w-5 h-5 text-primary" /></div>
+                             <div>
+                               <p className="text-lg font-bold italic">"{item.command}"</p>
+                               <div className="flex items-center gap-4 text-[10px] font-black uppercase text-gray-500 mt-1">
+                                 <span>{item.timestamp}</span>
+                                 <span className="text-primary">{item.action}</span>
+                               </div>
+                             </div>
                           </div>
-                          <div>
-                            <p className="font-bold text-lg">"{item.command}"</p>
-                            <div className="flex items-center gap-3 text-xs text-gray-500">
-                              <span>{item.timestamp}</span>
-                              <span className="px-2 py-0.5 bg-white/5 rounded uppercase">{item.action}</span>
-                            </div>
-                          </div>
+                          <button onClick={() => clearHistory(item.id)} className="opacity-0 group-hover:opacity-100 p-3 hover:bg-accent/20 rounded-xl transition-all"><Trash2 className="w-5 h-5 text-accent" /></button>
                         </div>
-                        <button 
-                          onClick={() => deleteHistory(item.id)}
-                          className="opacity-0 group-hover:opacity-100 p-2 hover:bg-accent/20 rounded-lg transition-all text-gray-400 hover:text-accent"
-                        >
-                          <Trash2 className="w-5 h-5" />
-                        </button>
-                      </div>
-                    ))
-                  )}
-                </div>
+                      ))
+                    )}
+                 </div>
               </motion.div>
             ) : null}
           </AnimatePresence>
         </main>
 
-        {/* Right Panel - Tools */}
-        <aside className="w-80 glass-morphism border-l border-white/10 p-6 hidden xl:block space-y-8">
+        {/* Pro Control Panel */}
+        <aside className="w-96 glass-morphism border-l border-white/5 p-8 hidden xl:block space-y-12">
+          {/* Social Presets */}
           <div>
-            <h3 className="text-sm font-bold mb-4 flex items-center gap-2">
-              <Maximize className="w-4 h-4 text-primary" />
-              Social Media Sizes
-            </h3>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="flex items-center gap-2 mb-6">
+              <Monitor className="w-4 h-4 text-primary" />
+              <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Social Presets</h3>
+            </div>
+            <div className="grid grid-cols-1 gap-3">
               {socialSizes.map(size => (
                 <button
                   key={size.value}
-                  onClick={() => setSelectedSize(size.value)}
-                  className={`p-3 rounded-xl border transition-all text-left ${
-                    selectedSize === size.value ? 'bg-primary/20 border-primary text-primary' : 'bg-white/5 border-white/10 text-gray-400 hover:border-white/20'
+                  onClick={() => { setSelectedSize(size.value); runAICommand(`Resize to ${size.dims}`); }}
+                  className={`p-5 rounded-3xl border transition-all text-left flex items-center justify-between group ${
+                    selectedSize === size.value ? 'bg-primary/20 border-primary shadow-lg shadow-primary/10' : 'bg-white/5 border-white/10 hover:border-white/30'
                   }`}
                 >
-                  <p className="text-[10px] font-bold uppercase">{size.label}</p>
-                  <p className="text-xs font-medium">{size.dims}</p>
+                  <div>
+                    <p className="text-xs font-black uppercase mb-1 tracking-wider">{size.label}</p>
+                    <p className="text-[10px] font-bold text-gray-500">{size.dims} PX</p>
+                  </div>
+                  <Share2 className={`w-4 h-4 transition-all ${selectedSize === size.value ? 'text-primary' : 'text-gray-600 group-hover:text-white'}`} />
                 </button>
               ))}
             </div>
           </div>
 
+          {/* Custom Sizing */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Maximize className="w-4 h-4 text-primary" />
+              <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Custom Dimensions</h3>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold text-gray-600 uppercase">Width</p>
+                <input type="number" placeholder="1080" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs focus:border-primary outline-none transition-all" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold text-gray-600 uppercase">Height</p>
+                <input type="number" placeholder="1080" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs focus:border-primary outline-none transition-all" />
+              </div>
+            </div>
+            <button className="w-full py-3 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase hover:bg-primary transition-all">Apply Custom Size</button>
+          </div>
+
+          {/* Ready to Use Prompts */}
           <div>
-            <h3 className="text-sm font-bold mb-4 flex items-center gap-2">
+            <div className="flex items-center gap-2 mb-6">
               <Sparkles className="w-4 h-4 text-primary" />
-              Ready Prompts
-            </h3>
-            <div className="space-y-2">
+              <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Ready to Use Prompts</h3>
+            </div>
+            <div className="flex flex-wrap gap-2">
               {[
                 'Professional Amazon Listing',
                 'Cinematic Forest Background',
@@ -378,7 +429,7 @@ export default function PhotoProStudio() {
                 <button
                   key={prompt}
                   onClick={() => setCommand(prompt)}
-                  className="w-full text-left p-3 text-xs font-medium bg-white/5 rounded-xl hover:bg-primary/10 hover:text-primary transition-all border border-white/5"
+                  className="px-4 py-2 text-[10px] font-black uppercase bg-white/5 rounded-xl border border-white/5 hover:border-primary/50 hover:bg-primary/5 hover:text-primary transition-all"
                 >
                   {prompt}
                 </button>
@@ -386,26 +437,39 @@ export default function PhotoProStudio() {
             </div>
           </div>
 
-          <div className="p-6 glass-morphism rounded-3xl border-primary/20 bg-primary/5">
-             <h4 className="font-bold text-sm mb-2">Pro Export</h4>
-             <p className="text-xs text-gray-400 mb-4">Export all processed images in high quality.</p>
-             <button className="w-full py-3 bg-primary rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg hover:scale-[1.02] active:scale-95 transition-all">
-               <Download className="w-4 h-4" />
-               Download All (ZIP)
-             </button>
-             <div className="mt-4 flex justify-between text-[10px] font-bold text-gray-500 uppercase">
-               <span>Format: PNG</span>
-               <span>Quality: 100%</span>
+          {/* Export Settings */}
+          <div className="p-8 rounded-[2.5rem] bg-gradient-to-br from-primary/20 via-primary/5 to-transparent border border-primary/20 space-y-8 shadow-2xl">
+             <div className="flex items-center justify-between">
+                <h4 className="font-black italic uppercase tracking-tighter text-lg">Export Pro</h4>
+                <div className="p-2 bg-primary rounded-xl"><Download className="w-5 h-5" /></div>
              </div>
+             
+             <div className="space-y-6">
+                <div className="space-y-2">
+                   <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Format</p>
+                   <div className="flex gap-2">
+                      {['PNG', 'JPG', 'WEBP'].map(f => (
+                        <button key={f} onClick={() => setExportFormat(f)} className={`flex-1 py-2 rounded-xl text-[10px] font-black border transition-all ${exportFormat === f ? 'bg-primary border-primary' : 'bg-white/5 border-white/10 hover:border-white/30'}`}>{f}</button>
+                      ))}
+                   </div>
+                </div>
+
+                <div className="space-y-2">
+                   <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Quality</p>
+                   <div className="flex gap-2">
+                      {['HD', '2K', '4K'].map(q => (
+                        <button key={q} onClick={() => setExportQuality(q)} className={`flex-1 py-2 rounded-xl text-[10px] font-black border transition-all ${exportQuality === q ? 'bg-primary border-primary text-white' : 'bg-white/5 border-white/10 hover:border-white/30'}`}>{q}</button>
+                      ))}
+                   </div>
+                </div>
+             </div>
+
+             <button className="w-full py-5 bg-white text-black rounded-[2rem] font-black uppercase tracking-[0.2em] text-xs shadow-2xl hover:bg-primary hover:text-white transition-all active:scale-95 flex items-center justify-center gap-3">
+               <span>Process & Save</span>
+               <Save className="w-4 h-4" />
+             </button>
           </div>
         </aside>
-      </div>
-
-      {/* Mobile Nav Toggle */}
-      <div className="lg:hidden fixed bottom-6 right-6 z-[100]">
-        <button className="w-14 h-14 bg-primary rounded-full shadow-2xl flex items-center justify-center glow-effect">
-          <Menu className="w-6 h-6" />
-        </button>
       </div>
     </div>
   );
